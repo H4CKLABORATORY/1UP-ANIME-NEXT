@@ -232,9 +232,11 @@ async function main() {
     run('sha256sum',['-c',SIDE],{cwd:ROOT});
     run('unzip',['-tq',path.join(ROOT,ZIP)]);
     const listing = run('unzip',['-Z1',path.join(ROOT,ZIP)],{cwd:ROOT}).trim().split(/\r?\n/);
-    if (listing.length !== 99 || listing.some(n => !n || n.includes('/') || n.includes('\\')) ||
-        new Set(listing).size !== 99 || listing.filter(n => n.endsWith('.tgz')).length !== 97) {
-      throw new Error(`ZIP inválido: entries=${listing.length}`);
+    const expectedArchive = new Set(['manifest.json','BUNDLE_FILES.sha256',...manifest.entries.map(e => e.fileName)]);
+    if (listing.length !== 99 || listing.some(n => !n || n.includes('/') || n.includes('\\') || !expectedArchive.has(n)) ||
+        new Set(listing).size !== 99 || listing.filter(n => n.endsWith('.tgz')).length !== 97 ||
+        [...expectedArchive].some(n => !listing.includes(n))) {
+      throw new Error(\`ZIP inválido: entries=\${listing.length}\`);
     }
     const extracted = path.join(tempRoot,'verify');
     fs.mkdirSync(extracted);
@@ -242,10 +244,17 @@ async function main() {
     const extractedManifest = JSON.parse(fs.readFileSync(path.join(extracted,'manifest.json'),'utf8'));
     audit(lock, extractedManifest, extracted);
     const sums = fs.readFileSync(path.join(extracted,'BUNDLE_FILES.sha256'),'utf8').trim().split(/\r?\n/);
+    const expectedSumNames = new Set(manifest.entries.map(e => e.fileName));
+    const seenSumNames = new Set();
     if (sums.length !== 97) throw new Error('BUNDLE_FILES.sha256 no contiene 97 líneas');
     for (const line of sums) {
       const m = /^([a-f0-9]{64})  ([^/\\]+)$/.exec(line);
-      if (!m || sha256(fs.readFileSync(path.join(extracted,m[2]))) !== m[1]) throw new Error(`checksum ZIP incorrecto: ${line}`);
+      if (!m || seenSumNames.has(m[2]) || !expectedSumNames.has(m[2]) ||
+          sha256(fs.readFileSync(path.join(extracted,m[2]))) !== m[1]) throw new Error(\`checksum ZIP incorrecto: \${line}\`);
+      seenSumNames.add(m[2]);
+    }
+    if (seenSumNames.size !== expectedSumNames.size || [...expectedSumNames].some(n => !seenSumNames.has(n))) {
+      throw new Error('BUNDLE_FILES.sha256 no cubre exactamente los 97 tarballs');
     }
     log('VEREDICTO: PASS (98/98 ubicaciones, 97/97 archivos, integridad OK)');
     log('=== MÁQUINA A COMPLETADA (PASS real) ===');
