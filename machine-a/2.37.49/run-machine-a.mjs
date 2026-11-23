@@ -84,7 +84,7 @@ function buildManifest(lock) {
     entries
   };
 }
-function audit(lock, manifest, directory) {
+function audit(lock, manifest, directory, allowChecksum = false) {
   const locked = Object.entries(lock.packages || {}).filter(([k,v]) =>
     k.startsWith('node_modules/') && !v.link && v.resolved && v.integrity
   );
@@ -137,7 +137,7 @@ function audit(lock, manifest, directory) {
     ok++;
   }
   if (errors.length || ok !== 97) throw new Error('AUDIT FAIL:\n' + errors.join('\n'));
-  const expectedFiles = new Set(['manifest.json', ...manifest.entries.map(e => e.fileName)]);
+  const expectedFiles = new Set(['manifest.json', ...(allowChecksum ? ['BUNDLE_FILES.sha256'] : []), ...manifest.entries.map(e => e.fileName)]);
   const actualFiles = fs.readdirSync(directory);
   if (actualFiles.length !== expectedFiles.size || actualFiles.some(name => !expectedFiles.has(name))) {
     throw new Error('set físico de vendor no coincide exactamente con manifest');
@@ -242,7 +242,7 @@ async function main() {
     fs.mkdirSync(extracted);
     run('unzip',['-q',path.join(ROOT,ZIP),'-d',extracted],{cwd:ROOT});
     const extractedManifest = JSON.parse(fs.readFileSync(path.join(extracted,'manifest.json'),'utf8'));
-    audit(lock, extractedManifest, extracted);
+    audit(lock, extractedManifest, extracted, true);
     const sums = fs.readFileSync(path.join(extracted,'BUNDLE_FILES.sha256'),'utf8').trim().split(/\r?\n/);
     const expectedSumNames = new Set(manifest.entries.map(e => e.fileName));
     const seenSumNames = new Set();
