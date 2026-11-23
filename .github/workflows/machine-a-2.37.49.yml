@@ -1,0 +1,65 @@
+name: 1UP ANIME 2.37.49 — Máquina A
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Confirma la descarga real de los 97 tarballs públicos de npm"
+        required: true
+        type: choice
+        options:
+          - RUN_MACHINE_A
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oneup-anime-machine-a-2-37-49
+  cancel-in-progress: false
+
+jobs:
+  machine-a:
+    name: Descargar, validar SRI y crear bundle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout del runner aislado
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js exacto
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.16.0
+
+      - name: Restaurar lockfile exacto y comprobar SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode machine-a/2.37.49/package-lock.json.gz.b64 | gzip --decompress --stdout > package-lock.json
+          printf '%s  %s\n' 'd1a5c0952eca273d3138df357bf8687eb561ba4f1e4cf198fc42465256142a46' package-lock.json | sha256sum --check -
+          test "$(node --version)" = "v22.16.0"
+
+      - name: Instalar utilidades de archivo
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes zip unzip
+
+      - name: Ejecutar Máquina A 2.37.49
+        shell: bash
+        run: |
+          set -euo pipefail
+          node machine-a/2.37.49/run-machine-a.mjs
+
+      - name: Publicar únicamente bundle, sidecar y log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 1up-anime-machine-a-2.37.49-${{ github.run_id }}
+          path: |
+            vendor-bundle-2.37.49.zip
+            vendor-bundle-2.37.49.zip.sha256
+            machine-a-*.log
+          if-no-files-found: warn
+          retention-days: 7
