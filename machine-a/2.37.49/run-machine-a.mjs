@@ -92,6 +92,7 @@ function audit(lock, manifest, directory) {
   const seenIntegrity = new Set();
   const seenNames = new Set();
   const errors = [];
+  if (manifest.schemaVersion !== 2 || manifest.lockfileVersion !== lock.lockfileVersion) errors.push('schema/lockfileVersion no coincide');
   for (const e of manifest.entries || []) {
     if (!e.integrity || !e.fileName || !Array.isArray(e.keys) || !Array.isArray(e.locations)) {
       errors.push('entry incompleta'); continue;
@@ -105,6 +106,8 @@ function audit(lock, manifest, directory) {
     const keys = e.locations.map(x => x.key).sort();
     if (JSON.stringify([...e.keys].sort()) !== JSON.stringify(keys)) errors.push(`keys/locations no coinciden: ${e.fileName}`);
     if (JSON.stringify(e.resolvedUrls) !== JSON.stringify([...new Set(e.locations.map(x => x.resolved))].sort())) errors.push(`resolvedUrls incorrectas: ${e.fileName}`);
+    const principal = e.locations.slice().sort((a,b) => a.key.localeCompare(b.key))[0]?.resolved;
+    if (e.resolved !== principal) errors.push(`resolved principal incorrecto: ${e.fileName}`);
     for (const loc of e.locations) {
       if (byKey.has(loc.key)) errors.push(`ubicación duplicada: ${loc.key}`);
       byKey.set(loc.key, {entry:e,loc});
@@ -134,6 +137,11 @@ function audit(lock, manifest, directory) {
     ok++;
   }
   if (errors.length || ok !== 97) throw new Error('AUDIT FAIL:\n' + errors.join('\n'));
+  const expectedFiles = new Set(['manifest.json', ...manifest.entries.map(e => e.fileName)]);
+  const actualFiles = fs.readdirSync(directory);
+  if (actualFiles.length !== expectedFiles.size || actualFiles.some(name => !expectedFiles.has(name))) {
+    throw new Error('set físico de vendor no coincide exactamente con manifest');
+  }
   log('AUDIT: PASS (98/98 ubicaciones, 97/97 archivos)');
 }
 async function main() {
