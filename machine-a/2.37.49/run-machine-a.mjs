@@ -236,7 +236,7 @@ async function main() {
     if (listing.length !== 99 || listing.some(n => !n || n.includes('/') || n.includes('\\') || !expectedArchive.has(n)) ||
         new Set(listing).size !== 99 || listing.filter(n => n.endsWith('.tgz')).length !== 97 ||
         [...expectedArchive].some(n => !listing.includes(n))) {
-      throw new Error(\`ZIP inválido: entries=\${listing.length}\`);
+      throw new Error(`ZIP inválido: entries=\${listing.length}`);
     }
     const extracted = path.join(tempRoot,'verify');
     fs.mkdirSync(extracted);
@@ -250,7 +250,7 @@ async function main() {
     for (const line of sums) {
       const m = /^([a-f0-9]{64})  ([^/\\]+)$/.exec(line);
       if (!m || seenSumNames.has(m[2]) || !expectedSumNames.has(m[2]) ||
-          sha256(fs.readFileSync(path.join(extracted,m[2]))) !== m[1]) throw new Error(\`checksum ZIP incorrecto: \${line}\`);
+          sha256(fs.readFileSync(path.join(extracted,m[2]))) !== m[1]) throw new Error(`checksum ZIP incorrecto: \${line}`);
       seenSumNames.add(m[2]);
     }
     if (seenSumNames.size !== expectedSumNames.size || [...expectedSumNames].some(n => !seenSumNames.has(n))) {
