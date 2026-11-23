@@ -50,6 +50,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node --check machine-a/2.37.49/run-machine-a.mjs
           node machine-a/2.37.49/run-machine-a.mjs
 
       - name: Publicar únicamente bundle, sidecar y log
